@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Development Office</title>
+  <style>
+    :root {
+      --bg: rgba(10, 13, 18, 0.78);
+      --bg-strong: rgba(8, 10, 14, 0.92);
+      --line: rgba(255, 255, 255, 0.16);
+      --text: #f7f4ec;
+      --muted: #b7c0cc;
+      --green: #45c47a;
+      --red: #ff5d5d;
+      --amber: #e8b84f;
+      --cyan: #70d6ff;
+      --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      color: var(--text);
+      background: #080a0f;
+      font-family: var(--font);
+    }
+
+    canvas {
+      display: block;
+    }
+
+    #hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    #top-bar {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 10px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(8, 10, 14, 0.62);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 14px 45px rgba(0, 0, 0, 0.24);
+    }
+
+    #office-name {
+      min-width: 0;
+      color: var(--muted);
+      font-size: 13px;
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    #pipeline-indicator {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    #backend-state {
+      color: var(--cyan);
+      font-size: 12px;
+    }
+
+    .dot {
+      width: 11px;
+      height: 11px;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.1);
+      box-shadow: 0 0 0 0 rgba(112, 214, 255, 0);
+    }
+
+    .dot.done {
+      border-color: var(--green);
+      background: var(--green);
+    }
+
+    .dot.current {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 5px rgba(112, 214, 255, 0.18);
+    }
+
+    .dot.error {
+      border-color: var(--red);
+      background: var(--red);
+      box-shadow: 0 0 0 5px rgba(255, 107, 107, 0.18);
+    }
+
+    #crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 24px;
+      height: 24px;
+      transform: translate(-50%, -50%);
+      color: rgba(255, 255, 255, 0.82);
+      font-size: 22px;
+      line-height: 22px;
+      text-align: center;
+      text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
+    }
+
+    #room-panel,
+    #log-panel {
+      position: absolute;
+      bottom: 18px;
+      width: min(380px, calc(100vw - 32px));
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--bg);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    #room-panel {
+      left: 16px;
+      padding: 14px;
+      opacity: 0;
+      transform: translateX(-24px);
+      transition: opacity 220ms ease, transform 220ms ease;
+    }
+
+    #room-panel.visible {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    #room-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    #room-title {
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    #status-badge {
+      padding: 4px 8px;
+      border-radius: 999px;
+      color: #09100c;
+      background: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    #status-badge.working {
+      background: var(--amber);
+    }
+
+    #status-badge.done {
+      background: var(--green);
+    }
+
+    #status-badge.error {
+      color: #fff;
+      background: var(--red);
+    }
+
+    #task-text {
+      min-height: 42px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    #progress-track {
+      height: 6px;
+      margin-top: 12px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    #progress-fill {
+      width: 0;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--cyan), var(--green));
+      transition: width 220ms ease;
+    }
+
+    #log-panel {
+      right: 16px;
+      padding: 12px;
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1.45;
+      color: #d7dee8;
+    }
+
+    #log-panel h2 {
+      margin: 0 0 8px;
+      color: #fff;
+      font-family: var(--font);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    #log-lines {
+      display: grid;
+      gap: 5px;
+    }
+
+    .log-line {
+      overflow: hidden;
+      color: var(--muted);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #start-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 12;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 50% 42%, rgba(74, 64, 136, 0.3), transparent 34%),
+        rgba(4, 6, 10, 0.92);
+      transition: opacity 280ms ease, visibility 280ms ease;
+    }
+
+    #start-screen.hidden {
+      visibility: hidden;
+      opacity: 0;
+    }
+
+    #start-card {
+      max-width: 560px;
+      text-align: center;
+    }
+
+    #start-card h1 {
+      margin: 0 0 10px;
+      font-size: clamp(36px, 6vw, 66px);
+      line-height: 0.98;
+      letter-spacing: 0;
+    }
+
+    #start-card p {
+      margin: 8px 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    #input-panel {
+      position: fixed;
+      top: 0;
+      left: 50%;
+      z-index: 14;
+      width: min(720px, calc(100vw - 28px));
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-top: 0;
+      border-radius: 0 0 8px 8px;
+      background: var(--bg-strong);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.44);
+      pointer-events: auto;
+      transform: translate(-50%, -110%);
+      transition: transform 220ms ease;
+    }
+
+    #input-panel.visible {
+      transform: translate(-50%, 0);
+    }
+
+    #input-panel label {
+      display: block;
+      margin-bottom: 8px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    #app-description {
+      width: 100%;
+      min-height: 112px;
+      resize: vertical;
+      padding: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 8px;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.08);
+      font: 14px/1.45 var(--font);
+      outline: none;
+    }
+
+    #app-description:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 3px rgba(112, 214, 255, 0.16);
+    }
+
+    #input-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    #input-message {
+      min-height: 20px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    #start-pipeline {
+      min-height: 44px;
+      padding: 0 16px;
+      border: 0;
+      border-radius: 8px;
+      color: #07120d;
+      background: var(--green);
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    #start-pipeline:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    #three-error {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: none;
+      place-items: center;
+      padding: 24px;
+      background: #080a0f;
+      color: #fff;
+      text-align: center;
+      font: 16px/1.5 var(--font);
+    }
+
+    @media (max-width: 820px) {
+      #top-bar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      #log-panel {
+        display: none;
+      }
+
+      #room-panel {
+        right: 16px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="three-error">
+    <div>
+      <strong>Three.js could not be loaded.</strong><br>
+      Check your internet connection or run this file from a browser that can access the CDN.
+    </div>
+  </div>
+
+  <div id="hud" aria-hidden="true">
+    <div id="top-bar">
+      <div id="office-name">AI Development Office — Floor 1</div>
+      <div id="pipeline-indicator">
+        <span id="backend-state">Backend offline</span>
+        <span class="dot" id="dot-1"></span>
+        <span class="dot" id="dot-2"></span>
+        <span class="dot" id="dot-3"></span>
+        <span class="dot" id="dot-4"></span>
+      </div>
+    </div>
+
+    <div id="crosshair">+</div>
+
+    <section id="room-panel">
+      <div id="room-heading">
+        <div id="room-title">Room 101 Architect</div>
+        <div id="status-badge">Idle</div>
+      </div>
+      <div id="task-text">Waiting for pipeline activity.</div>
+      <div id="progress-track"><div id="progress-fill"></div></div>
+    </section>
+
+    <section id="log-panel">
+      <h2>Pipeline Log</h2>
+      <div id="log-lines">
+        <div class="log-line">Backend offline.</div>
+      </div>
+    </section>
+  </div>
+
+  <div id="start-screen">
+    <div id="start-card">
+      <h1>AI Development Office</h1>
+      <p>Click to enter</p>
+      <p>WASD to move. Mouse to look. Press E in the hallway to start a pipeline.</p>
+    </div>
+  </div>
+
+  <form id="input-panel">
+    <label for="app-description">Describe the web app for the agent team</label>
+    <textarea id="app-description" placeholder="Build a task manager with projects, due dates, and a clean dashboard."></textarea>
+    <div id="input-actions">
+      <div id="input-message">Press Escape to close.</div>
+      <button id="start-pipeline" type="submit">Start Pipeline</button>
+    </div>
+  </form>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    if (!window.THREE) {
+      document.getElementById('three-error').style.display = 'grid';
+      throw new Error('Three.js failed to load');
+    }
+
+    const API_BASE = 'http://localhost:8000';
+    const OFFICE_WIDTH = 40;
+    const OFFICE_DEPTH = 30;
+    const WALL_HEIGHT = 4;
+    const WALL_THICKNESS = 0.2;
+    const PLAYER_HEIGHT = 1.7;
+    const PLAYER_RADIUS = 0.3;
+    const MOVE_SPEED = 5;
+    const ROOM_Z_MIN = -15;
+    const ROOM_Z_MAX = -5;
+    const HALL_Z_MIN = -5;
+    const HALL_Z_MAX = 3;
+
+    const AGENTS = [
+      { id: 1, key: 'agent_1', room: '101', name: 'Architect', role: 'Specification', x: -15, accent: '#4A4088' },
+      { id: 2, key: 'agent_2', room: '102', name: 'Developer', role: 'Code Generation', x: -5, accent: '#0B5E48' },
+      { id: 3, key: 'agent_3', room: '103', name: 'Tester', role: 'Quality Assurance', x: 5, accent: '#8B2E10' },
+      { id: 4, key: 'agent_4', room: '104', name: 'Deployer', role: 'Release', x: 15, accent: '#1050A0' }
+    ];
+
+    const state = {
+      backendOnline: false,
+      currentAgent: 0,
+      logs: [],
+      lastTextureRefresh: 0,
+      currentRoomId: null,
+      inputVisible: false,
+      yaw: 0,
+      pitch: 0,
+      keys: {
+        forward: false,
+        backward: false,
+        left: false,
+        right: false
+      }
+    };
+
+    const rooms = new Map();
+    const agentMeshes = new Map();
+    const collisionBoxes = [];
+    const texturesToUpdate = [];
+
+    // 1. Scene, camera, renderer init
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#E8F4FF');
+    scene.fog = new THREE.Fog('#E8F4FF', 24, 70);
+
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, PLAYER_HEIGHT, 10);
+    camera.rotation.order = 'YXZ';
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.body.appendChild(renderer.domElement);
+
+    const clock = new THREE.Clock();
+
+    // 2. Lighting setup
+    function setupLighting() {
+      const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+      scene.add(ambient);
+
+      const hemi = new THREE.HemisphereLight(0xE8F4FF, 0xF0E8D0, 0.3);
+      scene.add(hemi);
+
+      const sun = new THREE.DirectionalLight(0xffffff, 0.5);
+      sun.position.set(10, 20, 10);
+      sun.castShadow = true;
+      scene.add(sun);
+
+      [-15, -5, 5, 15].forEach((x) => {
+        const light = new THREE.PointLight(0xffffff, 0.4, 14);
+        light.position.set(x, 3.65, -1);
+        scene.add(light);
+      });
+    }
+
+    // 3. buildOffice() - floor, ceiling, outer walls, hallway
+    function buildOffice() {
+      const floorMaterial = new THREE.MeshLambertMaterial({ color: '#D8D4CC' });
+      const hallwayMaterial = new THREE.MeshLambertMaterial({ color: '#C8C4BC' });
+      const ceilingMaterial = new THREE.MeshLambertMaterial({ color: '#FAFAFA', side: THREE.DoubleSide });
+
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(OFFICE_WIDTH, OFFICE_DEPTH), floorMaterial);
+      floor.rotation.x = -Math.PI / 2;
+      floor.receiveShadow = true;
+      scene.add(floor);
+
+      const hallway = new THREE.Mesh(new THREE.PlaneGeometry(OFFICE_WIDTH, 8), hallwayMaterial);
+      hallway.rotation.x = -Math.PI / 2;
+      hallway.position.set(0, 0.01, -1);
+      hallway.receiveShadow = true;
+      scene.add(hallway);
+
+      const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(OFFICE_WIDTH, OFFICE_DEPTH), ceilingMaterial);
+      ceiling.rotation.x = Math.PI / 2;
+      ceiling.position.set(0, WALL_HEIGHT, 0);
+      scene.add(ceiling);
+
+      addWall(0, WALL_HEIGHT / 2, -15, OFFICE_WIDTH, WALL_HEIGHT, WALL_THICKNESS);
+      addWall(0, WALL_HEIGHT / 2, 15, OFFICE_WIDTH, WALL_HEIGHT, WALL_THICKNESS);
+      addWall(-20, WALL_HEIGHT / 2, 0, WALL_THICKNESS, WALL_HEIGHT, OFFICE_DEPTH);
+      addWall(20, WALL_HEIGHT / 2, 0, WALL_THICKNESS, WALL_HEIGHT, OFFICE_DEPTH);
+    }
+
+    function addBox(width, height, depth, x, y, z, material, collides = false) {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+      if (collides) {
+        mesh.updateMatrixWorld(true);
+        collisionBoxes.push(new THREE.Box3().setFromObject(mesh));
+      }
+      return mesh;
+    }
+
+    function addWall(x, y, z, width, height, depth) {
+      const material = new THREE.MeshLambertMaterial({ color: '#F5F2EE' });
+      return addBox(width, height, depth, x, y, z, material, true);
+    }
+
+    // 4. buildRoom(id, x, config) - called 4 times, builds one room with all furniture
+    function buildRoom(id, x, config) {
+      const xMin = x - 4;
+      const xMax = x + 4;
+      const zCenter = (ROOM_Z_MIN + ROOM_Z_MAX) / 2;
+      const roomGroup = new THREE.Group();
+      roomGroup.name = `Room ${config.room} ${config.name}`;
+      scene.add(roomGroup);
+
+      const wallMaterial = new THREE.MeshLambertMaterial({ color: '#F5F2EE' });
+      const frameMaterial = new THREE.MeshLambertMaterial({ color: '#4A3520' });
+      const woodMaterial = new THREE.MeshLambertMaterial({ color: '#8B6914' });
+      const chairMaterial = new THREE.MeshLambertMaterial({ color: '#333333' });
+      const accentMaterial = new THREE.MeshLambertMaterial({ color: config.accent });
+      const glassMaterial = new THREE.MeshLambertMaterial({
+        color: '#AADDFF',
+        transparent: true,
+        opacity: 0.3,
+        side: THREE.DoubleSide
+      });
+
+      addBox(WALL_THICKNESS, WALL_HEIGHT, 10, xMin, WALL_HEIGHT / 2, zCenter, wallMaterial, true);
+      addBox(WALL_THICKNESS, WALL_HEIGHT, 10, xMax, WALL_HEIGHT / 2, zCenter, wallMaterial, true);
+      addBox(3, WALL_HEIGHT, WALL_THICKNESS, x - 2.5, WALL_HEIGHT / 2, ROOM_Z_MAX, wallMaterial, true);
+      addBox(3, WALL_HEIGHT, WALL_THICKNESS, x + 2.5, WALL_HEIGHT / 2, ROOM_Z_MAX, wallMaterial, true);
+
+      addBox(0.12, 3, 0.18, x - 1.06, 1.5, ROOM_Z_MAX + 0.06, frameMaterial, false);
+      addBox(0.12, 3, 0.18, x + 1.06, 1.5, ROOM_Z_MAX + 0.06, frameMaterial, false);
+      addBox(2.24, 0.16, 0.18, x, 3, ROOM_Z_MAX + 0.06, frameMaterial, false);
+
+      buildDesk(x, woodMaterial);
+      buildMonitor(id, x, config, accentMaterial);
+      buildChair(x, chairMaterial);
+      buildStatusScreen(id, x, config);
+      buildNameplate(x, config);
+      buildWindow(x, glassMaterial);
+
+      const deskLight = new THREE.PointLight(config.accent, 0, 8);
+      deskLight.position.set(x, 3.15, -13);
+      scene.add(deskLight);
+
+      rooms.set(id, {
+        id,
+        xMin,
+        xMax,
+        zMin: ROOM_Z_MIN,
+        zMax: ROOM_Z_MAX,
+        config,
+        deskLight
+      });
+    }
+
+    function buildDesk(x, material) {
+      addBox(3, 0.1, 1.5, x, 0.85, -13.55, material, false);
+      [-1.35, 1.35].forEach((dx) => {
+        [-0.62, 0.62].forEach((dz) => {
+          addBox(0.12, 0.75, 0.12, x + dx, 0.42, -13.55 + dz, material, false);
+        });
+      });
+    }
+
+    function buildMonitor(id, x, config) {
+      const caseMaterial = new THREE.MeshLambertMaterial({ color: '#111318' });
+      const standMaterial = new THREE.MeshLambertMaterial({ color: '#22252b' });
+      const screenMaterial = new THREE.MeshLambertMaterial({ color: config.accent });
+      addBox(1.7, 1.1, 0.08, x, 1.45, -12.93, caseMaterial, false);
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(1.45, 0.85), screenMaterial);
+      face.position.set(x, 1.45, -12.88);
+      scene.add(face);
+      addBox(0.18, 0.44, 0.18, x, 1.07, -13.2, standMaterial, false);
+      addBox(0.72, 0.06, 0.44, x, 0.88, -13.2, standMaterial, false);
+    }
+
+    function buildChair(x, material) {
+      addBox(0.8, 0.1, 0.8, x, 0.75, -12.05, material, false);
+      addBox(0.8, 0.8, 0.1, x, 1.15, -11.62, material, false);
+      [-0.3, 0.3].forEach((dx) => {
+        [-0.3, 0.3].forEach((dz) => {
+          const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.7, 12), material);
+          leg.position.set(x + dx, 0.37, -12.05 + dz);
+          leg.castShadow = true;
+          scene.add(leg);
+        });
+      });
+    }
+
+    // 5. buildAgent(id, x, config) - called 4 times, adds character mesh + stores reference for animation
+    function buildAgent(id, x, config) {
+      const group = new THREE.Group();
+      group.position.set(x, 0, -12.24);
+      scene.add(group);
+
+      const body = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.25, 0.25, 0.6, 24),
+        new THREE.MeshLambertMaterial({ color: config.accent })
+      );
+      body.position.y = 1.08;
+      body.castShadow = true;
+      group.add(body);
+
+      const head = new THREE.Mesh(
+        new THREE.SphereGeometry(0.2, 24, 16),
+        new THREE.MeshLambertMaterial({ color: '#F0C060' })
+      );
+      head.position.y = 1.55;
+      head.castShadow = true;
+      group.add(head);
+
+      const armMaterial = new THREE.MeshLambertMaterial({ color: config.accent });
+      [-0.32, 0.32].forEach((dx) => {
+        const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.5, 12), armMaterial);
+        arm.rotation.z = dx < 0 ? 0.7 : -0.7;
+        arm.position.set(dx, 1.05, -0.04);
+        group.add(arm);
+      });
+
+      agentMeshes.set(id, {
+        group,
+        body,
+        head,
+        status: 'idle',
+        taskText: 'Waiting for pipeline activity.',
+        progress: 0,
+        bobTime: 0
+      });
+    }
+
+    function buildStatusScreen(id, x, config) {
+      const textureInfo = createCanvasTexture(512, 160);
+      const material = new THREE.MeshLambertMaterial({
+        map: textureInfo.texture,
+        transparent: true,
+        side: THREE.DoubleSide
+      });
+      const screen = new THREE.Mesh(new THREE.PlaneGeometry(2, 0.6), material);
+      screen.position.set(x, 2.62, -12.55);
+      scene.add(screen);
+      texturesToUpdate.push({ type: 'status', id, config, ...textureInfo });
+    }
+
+    function buildNameplate(x, config) {
+      const textureInfo = createCanvasTexture(512, 180);
+      drawTextPanel(textureInfo.ctx, textureInfo.canvas, {
+        background: '#1b1f27',
+        title: `ROOM ${config.room}`,
+        subtitle: `${config.name} · ${config.role}`,
+        accent: config.accent
+      });
+      textureInfo.texture.needsUpdate = true;
+
+      const plate = new THREE.Mesh(
+        new THREE.PlaneGeometry(2.3, 0.82),
+        new THREE.MeshLambertMaterial({ map: textureInfo.texture, side: THREE.DoubleSide })
+      );
+      plate.position.set(x + 2.35, 2.05, ROOM_Z_MAX + 0.115);
+      scene.add(plate);
+    }
+
+    function buildWindow(x, material) {
+      [-0.85, 0.85].forEach((dx) => {
+        const pane = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.1), material);
+        pane.position.set(x + dx, 2.35, ROOM_Z_MIN + 0.12);
+        scene.add(pane);
+      });
+    }
+
+    function createCanvasTexture(width, height) {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      return { canvas, ctx, texture };
+    }
+
+    function drawTextPanel(ctx, canvas, details) {
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = details.background;
+      ctx.fillRect(0, 0, width, height);
+      ctx.fillStyle = details.accent || '#70d6ff';
+      ctx.fillRect(0, 0, width, 10);
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.fillRect(16, 22, width - 32, height - 38);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '700 36px Arial, sans-serif';
+      ctx.fillText(details.title, 28, 62);
+      ctx.fillStyle = 'rgba(255,255,255,0.82)';
+      ctx.font = '24px Arial, sans-serif';
+      wrapCanvasText(ctx, details.subtitle || '', 28, 102, width - 56, 28, 2);
+    }
+
+    function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+      const words = String(text || '').split(/\s+/);
+      let line = '';
+      let lineCount = 0;
+      for (let i = 0; i < words.length; i += 1) {
+        const testLine = line ? `${line} ${words[i]}` : words[i];
+        if (ctx.measureText(testLine).width > maxWidth && line) {
+          ctx.fillText(line, x, y + lineCount * lineHeight);
+          line = words[i];
+          lineCount += 1;
+          if (lineCount >= maxLines) return;
+        } else {
+          line = testLine;
+        }
+      }
+      if (line && lineCount < maxLines) {
+        ctx.fillText(line, x, y + lineCount * lineHeight);
+      }
+    }
+
+    // 6. initControls() - pointer lock, keyboard listeners, movement state
+    function initControls() {
+      document.addEventListener('click', () => {
+        if (!state.inputVisible && document.pointerLockElement !== document.body) {
+          document.body.requestPointerLock();
+        }
+        dismissStartScreen();
+      });
+
+      document.addEventListener('pointerlockchange', () => {
+        dismissStartScreen();
+      });
+
+      document.addEventListener('mousemove', (event) => {
+        if (document.pointerLockElement !== document.body) return;
+        state.yaw -= event.movementX * 0.0022;
+        state.pitch -= event.movementY * 0.0022;
+        state.pitch = Math.max(-Math.PI / 2 + 0.05, Math.min(Math.PI / 2 - 0.05, state.pitch));
+        camera.rotation.y = state.yaw;
+        camera.rotation.x = state.pitch;
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.repeat && event.code !== 'KeyE') return;
+        if (event.code === 'Escape' && state.inputVisible) {
+          hideInputPanel();
+          return;
+        }
+        if (isTypingTarget(event.target)) {
+          if (event.code === 'Escape') hideInputPanel();
+          return;
+        }
+        setMovementKey(event.code, true);
+        if (event.code === 'KeyE' && !state.currentRoomId) {
+          showInputPanel();
+        }
+      });
+
+      document.addEventListener('keyup', (event) => {
+        setMovementKey(event.code, false);
+      });
+
+      document.getElementById('start-screen').addEventListener('click', () => {
+        dismissStartScreen();
+      });
+
+      const inputPanel = document.getElementById('input-panel');
+      inputPanel.addEventListener('submit', submitPipelineRequest);
+    }
+
+    function isTypingTarget(target) {
+      return target && ['TEXTAREA', 'INPUT', 'BUTTON'].includes(target.tagName);
+    }
+
+    function setMovementKey(code, isDown) {
+      if (code === 'KeyW' || code === 'ArrowUp') state.keys.forward = isDown;
+      if (code === 'KeyS' || code === 'ArrowDown') state.keys.backward = isDown;
+      if (code === 'KeyA' || code === 'ArrowLeft') state.keys.left = isDown;
+      if (code === 'KeyD' || code === 'ArrowRight') state.keys.right = isDown;
+    }
+
+    function dismissStartScreen() {
+      document.getElementById('start-screen').classList.add('hidden');
+    }
+
+    function showInputPanel() {
+      if (state.inputVisible) return;
+      state.inputVisible = true;
+      document.exitPointerLock?.();
+      const panel = document.getElementById('input-panel');
+      panel.classList.add('visible');
+      setTimeout(() => document.getElementById('app-description').focus(), 0);
+    }
+
+    function hideInputPanel() {
+      state.inputVisible = false;
+      document.getElementById('input-panel').classList.remove('visible');
+    }
+
+    async function submitPipelineRequest(event) {
+      event.preventDefault();
+      const textarea = document.getElementById('app-description');
+      const button = document.getElementById('start-pipeline');
+      const message = document.getElementById('input-message');
+      const description = textarea.value.trim();
+      if (!description) {
+        message.textContent = 'Enter an app description first.';
+        return;
+      }
+
+      button.disabled = true;
+      message.textContent = 'Pipeline started...';
+      try {
+        const response = await fetch(`${API_BASE}/api/run`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ description })
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        setTimeout(() => {
+          button.disabled = false;
+          hideInputPanel();
+          textarea.value = '';
+        }, 1200);
+      } catch (error) {
+        button.disabled = false;
+        message.textContent = 'Backend offline. Start the API server on port 8000.';
+      }
+    }
+
+    // 7. updateMovement(delta) - WASD logic with collision
+    function updateMovement(delta) {
+      if (state.inputVisible) return;
+      const move = new THREE.Vector3();
+      const forward = new THREE.Vector3(Math.sin(state.yaw), 0, -Math.cos(state.yaw));
+      const right = new THREE.Vector3(Math.cos(state.yaw), 0, Math.sin(state.yaw));
+
+      if (state.keys.forward) move.add(forward);
+      if (state.keys.backward) move.sub(forward);
+      if (state.keys.right) move.add(right);
+      if (state.keys.left) move.sub(right);
+
+      if (move.lengthSq() > 0) {
+        move.normalize().multiplyScalar(MOVE_SPEED * delta);
+        tryMove(move.x, 0);
+        tryMove(0, move.z);
+      }
+
+      detectRoom();
+    }
+
+    function tryMove(dx, dz) {
+      const next = camera.position.clone();
+      next.x += dx;
+      next.z += dz;
+      if (!collidesAt(next.x, next.z)) {
+        camera.position.x = next.x;
+        camera.position.z = next.z;
+      }
+    }
+
+    function collidesAt(x, z) {
+      return collisionBoxes.some((box) => {
+        return (
+          x > box.min.x - PLAYER_RADIUS &&
+          x < box.max.x + PLAYER_RADIUS &&
+          z > box.min.z - PLAYER_RADIUS &&
+          z < box.max.z + PLAYER_RADIUS
+        );
+      });
+    }
+
+    function detectRoom() {
+      let detected = null;
+      rooms.forEach((room) => {
+        const inside =
+          camera.position.x > room.xMin + PLAYER_RADIUS &&
+          camera.position.x < room.xMax - PLAYER_RADIUS &&
+          camera.position.z > room.zMin + PLAYER_RADIUS &&
+          camera.position.z < room.zMax - PLAYER_RADIUS;
+        if (inside) detected = room.id;
+      });
+
+      if (detected !== state.currentRoomId) {
+        if (state.currentRoomId) onExitRoom(state.currentRoomId);
+        if (detected) onEnterRoom(detected);
+        state.currentRoomId = detected;
+        updateRoomHUD();
+      }
+    }
+
+    function onEnterRoom(roomId) {
+      const room = rooms.get(roomId);
+      if (room) room.deskLight.intensity = 0.6;
+    }
+
+    function onExitRoom(roomId) {
+      const room = rooms.get(roomId);
+      if (room) room.deskLight.intensity = 0;
+    }
+
+    // 8. updateAgentAnimations(delta) - bob animation based on status
+    function updateAgentAnimations(delta) {
+      agentMeshes.forEach((agent) => {
+        if (agent.status === 'working') {
+          agent.bobTime += delta * 2.0;
+          agent.group.position.y = Math.sin(agent.bobTime * Math.PI * 2) * 0.03;
+          agent.group.rotation.x = 0;
+        } else if (agent.status === 'done') {
+          agent.group.position.y = 0;
+          agent.group.rotation.x = -0.2;
+        } else {
+          agent.group.position.y = 0;
+          agent.group.rotation.x = 0;
+        }
+      });
+    }
+
+    // 9. updateCanvasTextures() - refreshes CanvasTexture text on status screens
+    function updateCanvasTextures(force = false) {
+      const now = performance.now();
+      if (!force && now - state.lastTextureRefresh < 2000) return;
+      state.lastTextureRefresh = now;
+
+      texturesToUpdate.forEach((item) => {
+        const agent = agentMeshes.get(item.id);
+        if (!agent) return;
+        const color = statusColor(agent.status, item.config.accent);
+        drawTextPanel(item.ctx, item.canvas, {
+          background: color,
+          title: `${item.config.name}: ${labelForStatus(agent.status)}`,
+          subtitle: agent.taskText,
+          accent: state.currentAgent === item.id ? '#ffffff' : item.config.accent
+        });
+        item.texture.needsUpdate = true;
+      });
+    }
+
+    function statusColor(status, accent) {
+      if (status === 'done') return '#1f8f4d';
+      if (status === 'error') return '#9f2b2b';
+      if (status === 'working') return accent;
+      return '#202630';
+    }
+
+    function labelForStatus(status) {
+      if (status === 'working') return 'Working';
+      if (status === 'done') return 'Done';
+      if (status === 'error') return 'Error';
+      return 'Idle';
+    }
+
+    // 10. initHUD() - creates all HTML overlay elements
+    function initHUD() {
+      updatePipelineHUD();
+      updateRoomHUD();
+      updateLogPanel();
+    }
+
+    function updatePipelineHUD() {
+      document.getElementById('backend-state').textContent = state.backendOnline ? 'Backend online' : 'Backend offline';
+      document.getElementById('backend-state').style.color = state.backendOnline ? 'var(--green)' : 'var(--red)';
+
+      AGENTS.forEach((agent) => {
+        const dot = document.getElementById(`dot-${agent.id}`);
+        const mesh = agentMeshes.get(agent.id);
+        dot.classList.toggle('done', mesh?.status === 'done');
+        dot.classList.toggle('error', mesh?.status === 'error');
+        dot.classList.toggle('current', state.currentAgent === agent.id);
+      });
+    }
+
+    function updateRoomHUD() {
+      const panel = document.getElementById('room-panel');
+      if (!state.currentRoomId) {
+        panel.classList.remove('visible');
+        return;
+      }
+
+      const room = rooms.get(state.currentRoomId);
+      const agent = agentMeshes.get(state.currentRoomId);
+      document.getElementById('room-title').textContent = `${room.config.name} · Room ${room.config.room}`;
+      const badge = document.getElementById('status-badge');
+      badge.className = '';
+      badge.id = 'status-badge';
+      badge.classList.add(agent.status);
+      badge.textContent = labelForStatus(agent.status);
+      document.getElementById('task-text').textContent = agent.taskText;
+      document.getElementById('progress-fill').style.width = `${Math.round(agent.progress * 100)}%`;
+      panel.classList.add('visible');
+    }
+
+    function updateLogPanel() {
+      const logLines = document.getElementById('log-lines');
+      logLines.innerHTML = '';
+      const lines = state.logs.length ? state.logs.slice(-5) : ['Backend offline.'];
+      lines.forEach((line) => {
+        const row = document.createElement('div');
+        row.className = 'log-line';
+        row.textContent = line;
+        logLines.appendChild(row);
+      });
+    }
+
+    // 11. pollAPI() - sets up the interval fetch, updates scene state
+    function pollAPI() {
+      fetchStatus();
+      setInterval(fetchStatus, 2000);
+    }
+
+    async function fetchStatus() {
+      try {
+        const response = await fetch(`${API_BASE}/api/status`, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        state.backendOnline = true;
+        applyAPIState(data);
+      } catch (error) {
+        state.backendOnline = false;
+        state.currentAgent = 0;
+        AGENTS.forEach((config) => {
+          const mesh = agentMeshes.get(config.id);
+          mesh.status = 'idle';
+          mesh.taskText = 'Backend offline. Start the API server on port 8000.';
+          mesh.progress = 0;
+        });
+      }
+      updatePipelineHUD();
+      updateRoomHUD();
+      updateLogPanel();
+      updateCanvasTextures(true);
+    }
+
+    function applyAPIState(data) {
+      const pipelineStatus = data.pipeline_status || {};
+      state.currentAgent = Number(data.current_agent || 0);
+      state.logs = Array.isArray(data.logs) ? data.logs : [];
+
+      AGENTS.forEach((config) => {
+        const agent = agentMeshes.get(config.id);
+        const status = pipelineStatus[config.key] || 'idle';
+        agent.status = normalizeStatus(status);
+        agent.progress = progressForStatus(agent.status);
+        agent.taskText = taskForAgent(config.id, agent.status);
+      });
+    }
+
+    function normalizeStatus(status) {
+      if (status === 'working' || status === 'done' || status === 'error') return status;
+      return 'idle';
+    }
+
+    function progressForStatus(status) {
+      if (status === 'done') return 1;
+      if (status === 'working') return 0.55;
+      if (status === 'error') return 1;
+      return 0.08;
+    }
+
+    function taskForAgent(id, status) {
+      const agentMention = new RegExp(`Agent ${id}|agent_${id}|Agent ${id === 1 ? '1' : id}`);
+      const relevant = state.logs.slice().reverse().find((line) => agentMention.test(line));
+      const current = state.currentAgent === id ? state.logs[state.logs.length - 1] : '';
+      const raw = relevant || current || '';
+      const clean = raw.replace(/^\[[^\]]+\]\s*/, '');
+      if (clean) return clean;
+      if (status === 'working') return 'Working on the active pipeline step.';
+      if (status === 'done') return 'Completed this pipeline step.';
+      if (status === 'error') return 'An error was reported for this agent.';
+      return 'Waiting for pipeline activity.';
+    }
+
+    // 12. animate() - main loop
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+      updateMovement(delta);
+      updateAgentAnimations(delta);
+      updateCanvasTextures();
+      renderer.render(scene, camera);
+    }
+
+    function onResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    }
+
+    window.addEventListener('resize', onResize);
+
+    setupLighting();
+    buildOffice();
+    AGENTS.forEach((agent) => buildRoom(agent.id, agent.x, agent));
+    AGENTS.forEach((agent) => buildAgent(agent.id, agent.x, agent));
+    initControls();
+    initHUD();
+    pollAPI();
+    updateCanvasTextures(true);
+    const verifyParams = new URLSearchParams(window.location.search);
+    if (verifyParams.has('verify')) {
+      dismissStartScreen();
+    }
+    const verifyRoomId = Number(verifyParams.get('room'));
+    if (verifyRoomId && rooms.has(verifyRoomId)) {
+      const verifyRoom = rooms.get(verifyRoomId);
+      camera.position.set(verifyRoom.config.x, PLAYER_HEIGHT, -8.1);
+      state.yaw = 0;
+      state.pitch = 0;
+      camera.rotation.y = state.yaw;
+      camera.rotation.x = state.pitch;
+      detectRoom();
+    }
+    animate();
+
+    window.__officeDebug = {
+      scene,
+      camera,
+      renderer,
+      rooms,
+      agentMeshes,
+      collisionBoxes,
+      getState: () => ({
+        backendOnline: state.backendOnline,
+        currentRoomId: state.currentRoomId,
+        currentAgent: state.currentAgent,
+        canvasSize: {
+          width: renderer.domElement.width,
+          height: renderer.domElement.height
+        }
+      })
+    };
+  </script>
+</body>
+</html>

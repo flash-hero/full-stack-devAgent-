@@ -24,6 +24,43 @@ Install Python dependencies:
 pip install -r requirements.txt
 ```
 
+## Launch Everything
+
+Use the included PowerShell launcher from the project root:
+
+```powershell
+.\project.ps1 start
+```
+
+If PowerShell blocks script execution, use:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\project.ps1 start
+```
+
+Then open the UI at `http://localhost:5173`.
+
+Useful commands:
+
+```powershell
+.\project.ps1 status
+.\project.ps1 restart
+.\project.ps1 stop
+.\project.ps1 logs
+```
+
+The launcher starts:
+
+- Backend API on `http://localhost:8000`
+- UI on `http://localhost:5173`
+- Ollama on `http://localhost:11434` if it is installed and not already running
+
+To stop Ollama too when it was started by this launcher:
+
+```powershell
+.\project.ps1 stop -IncludeOllama
+```
+
 Start Ollama:
 
 ```bash
@@ -67,3 +104,7 @@ python -m pytest tests -q
 ```
 
 These tests cover the shared context and status/file API behavior without requiring Ollama.
+
+## UI
+
+The UI is included in `ui/`. It polls the backend at `http://localhost:8000/api/status` and starts pipelines through `POST http://localhost:8000/api/run`.

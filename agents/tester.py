@@ -2,6 +2,7 @@ import ast
 import json
 import re
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -242,7 +243,7 @@ def run(context: SharedContext) -> None:
 
         context.log("Running generated pytest suite")
         result = subprocess.run(
-            ["pytest", str(Path(OUTPUT_DIR) / "tests"), "--tb=short", "-q"],
+            [sys.executable, "-m", "pytest", str(Path(OUTPUT_DIR) / "tests"), "--tb=short", "-q"],
             capture_output=True,
             text=True,
             check=False,

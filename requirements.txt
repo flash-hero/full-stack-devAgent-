@@ -1,7 +1,9 @@
 docker>=7.1.0
 flask>=3.0.0
+Flask-SQLAlchemy>=3.1.1
 flask-cors>=4.0.0
 langchain-core>=0.3.0
 langchain-ollama>=0.2.0
 pytest>=8.0.0
 requests>=2.31.0
+SQLAlchemy>=2.0.0

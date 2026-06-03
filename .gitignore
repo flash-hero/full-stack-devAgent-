@@ -7,8 +7,11 @@ logs/*.log
 output/*
 !output/.gitkeep
 !output/app/
+output/app/*
 !output/app/.gitkeep
 !output/tests/
+output/tests/*
 !output/tests/.gitkeep
 !output/deploy/
+output/deploy/*
 !output/deploy/.gitkeep

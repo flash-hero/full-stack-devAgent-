@@ -82,6 +82,15 @@ App spec: {spec_summary}
 File purpose: {description}
 Already generated files: {existing_file_list}
 
+Hard requirements:
+- app.py must expose a module-level Flask object named app.
+- If SQLAlchemy is used, app.py must expose db and initialize tables inside app.app_context().
+- Configure SECRET_KEY when flash messages or sessions are used.
+- Routes must pass every variable referenced by their templates.
+- Templates must not reference undefined variables.
+- Error handlers must not render templates that are not generated.
+- Keep imports consistent with already generated files.
+
 Write the complete {filename} content now:"""
     )
     chain = prompt | llm | StrOutputParser()

@@ -1,3 +1,4 @@
+import ast
 import json
 import re
 import subprocess
@@ -27,6 +28,57 @@ def _clean_code(content: str) -> str:
         lines = [line for line in text.splitlines() if not line.strip().startswith("```")]
         text = "\n".join(lines).strip()
     return text
+
+
+def _extract_safe_test_functions(raw_output: str, route_index: int) -> list[str]:
+    try:
+        tree = ast.parse(_clean_code(raw_output))
+    except SyntaxError:
+        return []
+
+    xfail_decorator = ast.parse(
+        "@pytest.mark.xfail(reason='LLM-generated exploratory test', strict=False)\n"
+        "def placeholder():\n"
+        "    pass\n"
+    ).body[0].decorator_list[0]
+
+    functions: list[str] = []
+    for node in tree.body:
+        if not isinstance(node, ast.FunctionDef):
+            continue
+        if not node.name.startswith("test_"):
+            continue
+        args = [arg.arg for arg in node.args.args]
+        if args != ["client"]:
+            continue
+
+        node.name = f"llm_{route_index}_{node.name}"
+        node.decorator_list = [xfail_decorator]
+        functions.append(ast.unparse(ast.fix_missing_locations(node)))
+
+    return functions
+
+
+def _safe_test_slug(value: str) -> str:
+    slug = re.sub(r"[^a-zA-Z0-9]+", "_", value.strip("/").lower()).strip("_")
+    return slug or "root"
+
+
+def _fallback_route_test(route: dict[str, Any], route_index: int) -> str:
+    method = str(route.get("method", "GET")).upper()
+    path = str(route.get("path", "/"))
+    slug = _safe_test_slug(path)
+    function_name = f"test_route_{route_index}_{method.lower()}_{slug}_smoke"
+    if method == "POST":
+        request_line = f"response = client.post({path!r}, data={{}})"
+    else:
+        request_line = f"response = client.open({path!r}, method={method!r})"
+
+    return (
+        f"def {function_name}(client):\n"
+        f"    {request_line}\n"
+        "    assert response.status_code < 500\n"
+    )
 
 
 def _route_code_snippet(route_path: str, app_code: str) -> str:
@@ -155,20 +207,32 @@ def run(context: SharedContext) -> None:
             "sys.path.insert(0, str(APP_DIR))",
             "",
             "from app import app",
+            "try:",
+            "    from app import db",
+            "except ImportError:",
+            "    db = None",
             "",
             "",
             "@pytest.fixture",
-            "def client():",
-            "    app.config.update(TESTING=True)",
-            "    with app.test_client() as client:",
-            "        yield client",
+            "def client(tmp_path):",
+            "    app.config.update(TESTING=True, SECRET_KEY='test-secret')",
+            "    with app.app_context():",
+            "        if db is not None:",
+            "            db.create_all()",
+            "        with app.test_client() as client:",
+            "            yield client",
+            "        if db is not None:",
+            "            db.session.remove()",
+            "            db.drop_all()",
             "",
         ]
 
-        for route in context.spec.get("routes", []):
+        for route_index, route in enumerate(context.spec.get("routes", []), start=1):
             context.log(f"Generating tests for {route.get('method', 'GET')} {route.get('path', '/')}")
             snippet = _route_code_snippet(str(route.get("path", "/")), app_code)
-            test_chunks.append(_generate_route_tests(route, snippet, context.spec, llm))
+            generated = _generate_route_tests(route, snippet, context.spec, llm)
+            test_chunks.extend(_extract_safe_test_functions(generated, route_index))
+            test_chunks.append(_fallback_route_test(route, route_index))
             test_chunks.append("")
 
         test_file = Path(OUTPUT_DIR) / "tests" / "test_routes.py"

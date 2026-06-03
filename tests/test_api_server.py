@@ -18,6 +18,18 @@ def test_status_returns_current_context(monkeypatch):
     assert payload["pipeline_status"]["agent_1"] == "working"
 
 
+def test_status_allows_frontend_cors_origin():
+    client = server.app.test_client()
+
+    response = client.get("/api/status", headers={"Origin": "http://127.0.0.1:5173"})
+
+    assert response.status_code == 200
+    assert response.headers["Access-Control-Allow-Origin"] in {
+        "*",
+        "http://127.0.0.1:5173",
+    }
+
+
 def test_files_lists_output_files(tmp_path, monkeypatch):
     output_dir = tmp_path / "output"
     nested = output_dir / "app"

@@ -1,0 +1,7 @@
+ARCHITECT_MODEL = "mistral:7b"
+DEVELOPER_MODEL = "qwen2.5-coder:7b"
+TESTER_MODEL = "qwen2.5-coder:7b"
+DEPLOYER_MODEL = "mistral:7b"
+OLLAMA_BASE_URL = "http://localhost:11434"
+OUTPUT_DIR = "./output"
+LOG_FILE = "./logs/pipeline.log"

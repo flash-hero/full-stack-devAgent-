@@ -1,7 +1,12 @@
 import threading
+import sys
+from pathlib import Path
 from typing import Any
 
 from flask import Flask, jsonify, request
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 try:
     from flask_cors import CORS
